@@ -5,6 +5,7 @@ using System.Text;
 using System.Web;
 using MvcJqGrid.DataReaders;
 using MvcJqGrid.Enums;
+using MvcJqGrid.Resources;
 
 namespace MvcJqGrid
 {
@@ -57,6 +58,7 @@ namespace MvcJqGrid
         private string _onSortCol;
         private int? _page;
         private string _pager;
+        private List<PagerButton> _pagerButtons = new List<PagerButton>();
         private PagerPos? _pagerPos;
         private bool? _pgButtons;
         private bool? _pgInput;
@@ -130,7 +132,7 @@ namespace MvcJqGrid
         ///     Set a zebra-striped grid (default: false)
         /// </summary>
         /// <param name = "altRows">Boolean indicating if zebra-striped grid is used</param>
-        public Grid SetAltRows(Boolean altRows)
+        public Grid SetAltRows(bool altRows)
         {
             _altRows = altRows;
             return this;
@@ -411,6 +413,16 @@ namespace MvcJqGrid
         public Grid SetPagerPos(PagerPos pagerPos)
         {
             _pagerPos = pagerPos;
+            return this;
+        }
+
+        /// <summary>
+        ///     Adds custom button to pager
+        /// </summary>
+        /// <param name = "button">PagerButton object</param>
+        public Grid AddPagerButton(PagerButton button)
+        {
+            _pagerButtons.Add(button);
             return this;
         }
 
@@ -1000,8 +1012,7 @@ namespace MvcJqGrid
             _onSelectAll = onSelectAll;
             return this;
         }
-
-
+        
         /// <summary>
         ///     Raised immediately when row is clicked. 
         ///     Variables available in function call:
@@ -1015,8 +1026,7 @@ namespace MvcJqGrid
             _onSelectRow = onSelectRow;
             return this;
         }
-
-
+        
         /// <summary>
         ///     Raised immediately after sortable column was clicked and before sorting the data.
         ///     Variables available in call:
@@ -1089,7 +1099,7 @@ namespace MvcJqGrid
             var script = new StringBuilder();
 
             // Start script
-           script.AppendLine("jQuery(document).ready(function () {");
+            script.AppendLine("jQuery(document).ready(function () {");
             script.AppendLine("jQuery('#" + _id + "').jqGrid({");
 
             // Altrows
@@ -1187,7 +1197,7 @@ namespace MvcJqGrid
             if (_page.HasValue) script.AppendFormat("page:{0},", _page).AppendLine();
 
             // Pager
-            if (!string.IsNullOrWhiteSpace(_pager)) script.AppendFormat("pager:'#{0}',", _pager).AppendLine();
+            if (_pager != null) script.AppendFormat("pager:'#{0}',", _pager).AppendLine();
 
             // PagerPos
             if (_pagerPos.HasValue) script.AppendFormat("pagerpos:'{0}',", _pagerPos.ToString().ToLower()).AppendLine();
@@ -1372,26 +1382,37 @@ namespace MvcJqGrid
             // End jqGrid call
             script.AppendLine("});");
 
-            if (_searchToolbar == true && !string.IsNullOrWhiteSpace(_pager) &&
-                (_searchClearButton.HasValue && _searchClearButton == true || _searchToggleButton.HasValue && _searchToggleButton == true))
-            {
-                script.AppendLine("jQuery('#" + _id + "').jqGrid('navGrid',\"#" + _pager +
-                                                 "\",{edit:false,add:false,del:false,search:false,refresh:false}); ");
-            }
+
+            //Render pager
+            if (!string.IsNullOrWhiteSpace(_pager))
+                if (_searchToolbar == true && _pager != null &&
+                    (_searchClearButton.HasValue && _searchClearButton == true || _searchToggleButton.HasValue && _searchToggleButton == true || _pagerButtons.Count > 0))
+                {
+                    script.AppendLine("jQuery('#" + _id + "').jqGrid('navGrid',\"#" + _pager +
+                                                     "\",{edit:false,add:false,del:false,search:false,refresh:false}); ");
+                }
 
             // Search clear button
             if (_searchToolbar == true && _searchClearButton.HasValue && !string.IsNullOrWhiteSpace(_pager) &&
                 _searchClearButton == true)
             {
                 script.AppendLine("jQuery('#" + _id + "').jqGrid('navButtonAdd',\"#" + _pager +
-                                 "\",{caption:\"Clear\",title:\"Clear Search\",buttonicon :'ui-icon-refresh', onClickButton:function(){mygrid[0].clearToolbar(); }}); ");
+                                 "\",{caption:\"" + Resource.Clear_Caption + "\",title:\"" + Resource.Clear_Title + "\",buttonicon :'ui-icon-refresh', onClickButton:" + Resource.Clear_Script + "}); ");
             }
 
+            // Search toggle button
             if (_searchToolbar == true && _searchToggleButton.HasValue && !string.IsNullOrWhiteSpace(_pager) && _searchToggleButton == true)
             {
                 script.AppendLine("jQuery('#" + _id + "').jqGrid('navButtonAdd',\"#" + _pager +
-                              "\",{caption:\"Toggle Search\",title:\"Toggle Search\",buttonicon :'ui-icon-refresh', onClickButton:function(){mygrid[0].toggleToolbar(); }}); ");
+                              "\",{caption:\"" + Resource.Toggle_Caption + "\",title:\"" + Resource.Toggle_Title + "\",buttonicon :'ui-icon-refresh', onClickButton:" + Resource.Toggle_Script + "}); ");
 
+            }
+
+            // Custom pager buttons
+            foreach (var item in _pagerButtons)
+            {
+                script.AppendLine("jQuery('#" + _id + "').jqGrid('navButtonAdd',\"#" + _pager +
+                              "\",{" + item.ToString() + "}); ");
             }
 
             // Search toolbar
@@ -1406,7 +1427,7 @@ namespace MvcJqGrid
 
             // End script
             script.AppendLine("});");
-      
+
             // Insert grid id where needed (in columns)
             script.Replace("##gridid##", _id);
 
@@ -1433,7 +1454,7 @@ namespace MvcJqGrid
 
             // Create pager element if is set
             var pager = new StringBuilder();
-            if (!string.IsNullOrWhiteSpace(_pager))
+            if (_pager != null)
             {
                 pager.AppendFormat("<div id=\"{0}\"></div>", _pager);
             }
