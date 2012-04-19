@@ -8,6 +8,7 @@ namespace MvcJqGrid
 {
     public class PagerButton
     {
+        private string _id;
         private string _caption;
         private string _buttonImg;
         private string _onClickButton;
@@ -28,6 +29,16 @@ namespace MvcJqGrid
         }
 
         /// <summary>
+        ///     Sets the Id of the button.
+        /// </summary>
+        /// <param name = "Id"></param>
+        public PagerButton SetId(string Id)
+        {
+            _id = Id;
+            return this;
+        }
+        
+        /// <summary>
         ///     Full path to valid image. If empty string, no image will be attached.
         /// </summary>
         /// <param name = "ButtonImg"></param>
@@ -42,7 +53,7 @@ namespace MvcJqGrid
         ///     (i.e., before or after the standard buttons).
         /// </summary>
         /// <param name = "recordPos">Position of record information</param>
-        public PagerButton SetRecordPos(PagerButtonPosition Position)
+        public PagerButton SetPosition(PagerButtonPosition Position)
         {
             _position = Position;
             return this;
@@ -59,6 +70,16 @@ namespace MvcJqGrid
             return this;
         }
 
+        /// <summary>
+        ///     Sets the tooltip of the button.
+        /// </summary>
+        /// <param name = "Title">Title of the button</param>
+        public PagerButton SetTitle(string Title)
+        {
+            _title = Title;
+            return this;
+        }
+
         public override string ToString()
         {
             var options = new List<string>();
@@ -66,7 +87,11 @@ namespace MvcJqGrid
             // Caption
             if (!string.IsNullOrWhiteSpace(_caption))
                 options.Add("caption:\"" + _caption + "\"");
-            
+
+            // Id
+            if (!string.IsNullOrWhiteSpace(_id))
+                options.Add("id:\"" + _id + "\"");
+
             // Title
             if (!string.IsNullOrWhiteSpace(_title))
                 options.Add("title:\"" + _title + "\"");
@@ -77,7 +102,7 @@ namespace MvcJqGrid
 
             // onClickButton
             if (!string.IsNullOrWhiteSpace(_onClickButton))
-                options.Add("onClickButton: " + _title);
+                options.Add("onClickButton: " + _onClickButton);
             
             return string.Join(", ", options);
         }
