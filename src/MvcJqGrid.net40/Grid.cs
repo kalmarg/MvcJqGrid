@@ -5,6 +5,7 @@ using System.Text;
 using System.Web;
 using MvcJqGrid.DataReaders;
 using MvcJqGrid.Enums;
+using System.Web.Script.Serialization;
 using MvcJqGrid.Resources;
 
 namespace MvcJqGrid
@@ -132,7 +133,7 @@ namespace MvcJqGrid
         ///     Set a zebra-striped grid (default: false)
         /// </summary>
         /// <param name = "altRows">Boolean indicating if zebra-striped grid is used</param>
-        public Grid SetAltRows(bool altRows)
+        public Grid SetAltRows(Boolean altRows)
         {
             _altRows = altRows;
             return this;
@@ -1197,7 +1198,7 @@ namespace MvcJqGrid
             if (_page.HasValue) script.AppendFormat("page:{0},", _page).AppendLine();
 
             // Pager
-            if (_pager != null) script.AppendFormat("pager:'#{0}',", _pager).AppendLine();
+            if (!string.IsNullOrWhiteSpace(_pager)) script.AppendFormat("pager:'#{0}',", _pager).AppendLine();
 
             // PagerPos
             if (_pagerPos.HasValue) script.AppendFormat("pagerpos:'{0}',", _pagerPos.ToString().ToLower()).AppendLine();
@@ -1302,9 +1303,68 @@ namespace MvcJqGrid
                 script.AppendFormat("afterInsertRow: function(rowid, rowdata, rowelem) {{{0}}},", _onAfterInsertRow).
                     AppendLine();
 
+            // jqGrid Hacking detected beause jqGrid didn't implement default search value correctly we gonna fix this in here
+            if (_columns.Any(x => x.HasDefaultSearchValue))
+            {
+                #region jqGrid javascript onbefore request hack
+
+                var defaultValueColumns = _columns.Where(x => x.HasDefaultSearchValue).Select(x => new { field = x.Index, op = "bw", data = x.DefaultSearchValue });
+
+                var onbeforeRequestHack = @"
+                function() {
+
+                        var defaultValueColumns = " + new JavaScriptSerializer().Serialize(defaultValueColumns) + @";
+                        var colModel = this.p.colModel;
+
+                        if (defaultValueColumns.length > 0) {
+
+                            var postData = this.p.postData;
+
+                            var filters = {};
+
+                            if (postData.hasOwnProperty('filters')) {
+                                filters = JSON.parse(postData.filters);
+                            }
+
+                            var rules = [];
+
+                            if (filters.hasOwnProperty('rules')) {
+                                rules = filters.rules;
+                            }
+
+                            $.each(defaultValueColumns, function (defaultValueColumnIndex, defaultValueColumn) {
+
+                                $.each(rules, function (index, rule) {
+
+                                    if (defaultValueColumn.field == rule.field) {
+                                        delete rules[index];
+                                        return;
+                                    }
+                                });
+
+                                rules.push(defaultValueColumn);
+                            });
+
+                            filters.groupOp = 'AND';
+                            filters.rules = rules;
+
+                            postData._search = true;
+                            postData.filters = JSON.stringify(filters);
+                        }
+
+                        this.p.beforeRequest = function() { " + ((!string.IsNullOrWhiteSpace(_onBeforeRequest)) ? _onBeforeRequest : "") + @" };
+                        this.p.beforeRequest.call(this);
+                    } ";
+
+                #endregion
+
+                script.AppendFormat("beforeRequest: {0},", onbeforeRequestHack).AppendLine();
+            }
             // onBeforeRequest
-            if (!string.IsNullOrWhiteSpace(_onBeforeRequest))
+            else  if (!string.IsNullOrWhiteSpace(_onBeforeRequest))
+            {
                 script.AppendFormat("beforeRequest: function() {{{0}}},", _onBeforeRequest).AppendLine();
+            }
 
             // onBeforeSelectRow
             if (!string.IsNullOrWhiteSpace(_onBeforeSelectRow))
@@ -1316,7 +1376,7 @@ namespace MvcJqGrid
 
             // onLoadBeforeSend
             if (!string.IsNullOrWhiteSpace(_onLoadBeforeSend))
-                script.AppendFormat("loadBeforeSend: function(xhr) {{{0}}},", _onLoadBeforeSend).AppendLine();
+                script.AppendFormat("loadBeforeSend: function(xhr, settings) {{{0}}},", _onLoadBeforeSend).AppendLine();
 
             // onLoadComplete
             if (!string.IsNullOrWhiteSpace(_onLoadComplete))
@@ -1382,11 +1442,8 @@ namespace MvcJqGrid
             // End jqGrid call
             script.AppendLine("});");
 
-
-            //Render pager
-            if (!string.IsNullOrWhiteSpace(_pager))
-                if (_searchToolbar == true && _pager != null &&
-                    (_searchClearButton.HasValue && _searchClearButton == true || _searchToggleButton.HasValue && _searchToggleButton == true || _pagerButtons.Count > 0))
+            if (_searchToolbar == true && !string.IsNullOrWhiteSpace(_pager) &&
+                (_searchClearButton.HasValue && _searchClearButton == true || _searchToggleButton.HasValue && _searchToggleButton == true || _pagerButtons.Count > 0))
                 {
                     script.AppendLine("jQuery('#" + _id + "').jqGrid('navGrid',\"#" + _pager +
                                                      "\",{edit:false,add:false,del:false,search:false,refresh:false}); ");
@@ -1454,7 +1511,7 @@ namespace MvcJqGrid
 
             // Create pager element if is set
             var pager = new StringBuilder();
-            if (_pager != null)
+            if (!string.IsNullOrWhiteSpace(_pager))
             {
                 pager.AppendFormat("<div id=\"{0}\"></div>", _pager);
             }
